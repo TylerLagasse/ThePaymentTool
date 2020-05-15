@@ -132,21 +132,23 @@ namespace ACH_Decomp
                                     else if (line.Substring(0, 2).Contains("88"))
                                     {
                                         //Continuation Record
-                                        //c.BCRConv(line);
+                                        c.WIRE_Continuation(line);
                                         counter++;
                                     }
                                     else if (line.Substring(0, 2).Contains("49"))
                                     {
                                         //Account Trailer
-                                        //c.FCRConv(line);
+                                        c.WIRE_AccountTrailer(line);
                                         counter++;
                                     } else if (line.Substring(0, 2).Contains("98"))
                                     {
                                         //Group Trailer
+                                        c.WIRE_GroupTrailer(line);
                                         counter++;
                                     } else if (line.Substring(0, 2).Contains("99"))
                                     {
                                         //File Trailer
+                                        c.WIRE_FileTrailer(line);
                                         counter++;
                                     }
                                     else

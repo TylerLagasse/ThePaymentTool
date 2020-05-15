@@ -1456,10 +1456,23 @@ namespace ACH_Decomp
             FH.ReceiverIdentification = p.Substring(13, 9);
             FH.FileCreationDate = p.Substring(23, 6);
             FH.FileCreationTime = p.Substring(30, 4);
-            FH.FileIDNumber = p.Substring(35, 3);
-            FH.PhysicalRecordLength = p.Substring(39, 2);
-            FH.BlockSize = p.Substring(42, 1);
-            FH.VersionNumber = p.Substring(44, 1);
+            //optional or variable fields
+            FH.FileIDNumber = p.Substring(35);
+            int i = FH.FileIDNumber.IndexOf(',');
+            FH.FileIDNumber = FH.FileIDNumber.Substring(0, i);
+            int ni = (FH.RecordCode.Length + FH.ABAFRB.Length + FH.ReceiverIdentification.Length + FH.FileCreationDate.Length +
+                FH.FileCreationTime.Length + FH.FileIDNumber.Length + 6);
+            FH.PhysicalRecordLength = p.Substring(ni);
+            i = FH.PhysicalRecordLength.IndexOf(',');
+            FH.PhysicalRecordLength = FH.PhysicalRecordLength.Substring(0, i);
+            ni = ni + FH.PhysicalRecordLength.Length + 1;
+            FH.BlockSize = p.Substring(ni);
+            i = FH.BlockSize.IndexOf(',');
+            FH.BlockSize = FH.BlockSize.Substring(0, i);
+            ni = ni + FH.BlockSize.Length + 1;
+            FH.VersionNumber = p.Substring(ni);
+            i = FH.VersionNumber.IndexOf('/');
+            FH.VersionNumber = FH.VersionNumber.Substring(0, i);
             if (g == 3)
             {
                 {
@@ -1499,14 +1512,23 @@ namespace ACH_Decomp
         public void WIRE_GroupHeader(string p)
         {
             GroupHeader GH = new GroupHeader();
-            GH.RecordCode = p.Substring(0, 2);
-            GH.ReceiverIdentification = p.Substring(3, 9);
-            GH.ABAFRB = p.Substring(11, 9);
-            GH.GroupStatus = p.Substring(21, 1);
+            GH.RecordCode = p.Substring(0, 2); //fixedlength
+            GH.ReceiverIdentification = p.Substring(3, 9); //fixedlength
+            GH.ABAFRB = p.Substring(11, 9); //fixedlength
+            GH.GroupStatus = p.Substring(21, 1); //fixedlength
             GH.AsOfDate = p.Substring(23, 6);
             GH.AsOfTime = p.Substring(30, 4);
-            GH.CurrencyCode = p.Substring(35, 3);
-            GH.AsOfDateModififer = p.Substring(39, 1);
+            //since the next two fields are optional, we need to use index math
+            GH.CurrencyCode = p.Substring(35);
+            int i = GH.CurrencyCode.IndexOf(',');
+            GH.CurrencyCode = GH.CurrencyCode.Substring(0, i);
+            int ni = (GH.RecordCode.Length + GH.ReceiverIdentification.Length + GH.ABAFRB.Length + GH.GroupStatus.Length +
+                GH.AsOfDate.Length + GH.AsOfTime.Length + GH.CurrencyCode.Length + 5);
+            GH.AsOfDateModififer = p.Substring(ni);
+            i = GH.AsOfDateModififer.IndexOf('/');
+            GH.AsOfDateModififer = GH.AsOfDateModififer.Substring(0, i);
+            Console.WriteLine("currencycode is " + GH.CurrencyCode);
+            Console.WriteLine("asofdatemodifier is " + GH.AsOfDateModififer);
             if (g == 3)
             {
                 using (StreamWriter sw = File.AppendText(filepath))
@@ -1515,7 +1537,7 @@ namespace ACH_Decomp
                     StringWriter ssw = new StringWriter(sb);
                     JsonWriter w = new JsonTextWriter(sw);
                     w.Formatting = Newtonsoft.Json.Formatting.Indented;
-                    w.WriteStartObject();
+                    //w.WriteStartObject();
                     w.WritePropertyName("GroupHeader");
                     w.WriteStartObject();
                     w.WritePropertyName("RecordCode");
@@ -1538,33 +1560,77 @@ namespace ACH_Decomp
 
             }
         }
-        public void WIRE_AcctID(string p)
+        public void WIRE_AcctID(string p) //use index math
         {
             AccountIdentifier AI = new AccountIdentifier();
             AI.RecordCode = p.Substring(0, 2);
-            AI.CustomerAccountNumber = p.Substring(3, 12);
-            AI.CurrencyCode = p.Substring(16, 3);
+            AI.CustomerAccountNumber = p.Substring(3);
+            int i = AI.CustomerAccountNumber.IndexOf(',');
+            AI.CustomerAccountNumber = AI.CustomerAccountNumber.Substring(0, i);
+            int ni = AI.RecordCode.Length + AI.CustomerAccountNumber.Length + 2;
             try
             {
-                AI.TypeCode = p.Substring(20, 3);
-                AI.TypeCode = AI.TypeCode.TrimEnd(',');
-            } catch (ArgumentOutOfRangeException e)
-            {
-                Console.WriteLine(e);
-            } finally
-            {
-                Console.WriteLine("what a great finally statement");
+                AI.CurrencyCode = p.Substring(ni);
+                i = AI.CurrencyCode.IndexOf(',');
+                AI.CurrencyCode = AI.CurrencyCode.Substring(0, i);
+                ni = ni + AI.CurrencyCode.Length + 1;
+                try
+                {
+                    AI.TypeCode = p.Substring(ni);
+                    i = AI.TypeCode.IndexOf(',');
+                    AI.TypeCode = AI.TypeCode.Substring(0, i);
+                    ni = ni + AI.TypeCode.Length + 1;
+                    try
+                    {
+                        AI.Amount = p.Substring(ni);
+                        i = AI.Amount.IndexOf(',');
+                        AI.Amount = AI.Amount.Substring(0, i);
+                        ni = ni + AI.Amount.Length + 1;
+                        try
+                        {
+                            AI.ItemCount = p.Substring(ni);
+                            i = AI.ItemCount.IndexOf(',');
+                            AI.ItemCount = AI.ItemCount.Substring(0, i);
+                            ni = ni + AI.ItemCount.Length + 1;
+                            try
+                            {
+                                AI.FundsType = p.Substring(ni);
+                                i = AI.FundsType.IndexOf('/');
+                                AI.FundsType = AI.FundsType.Substring(0, i);
+                            }
+                            catch (ArgumentOutOfRangeException e)
+                            {
+                                Console.WriteLine(e);
+                            }
+                        }
+                        catch (ArgumentOutOfRangeException e)
+                        {
+                            Console.WriteLine(e);
+                        }
+                    }
+                    catch (ArgumentOutOfRangeException e)
+                    {
+                        Console.WriteLine(e);
+                    }
+                }
+                catch (ArgumentOutOfRangeException e)
+                {
+                    Console.WriteLine(e);
+                }
             }
-            try
+            catch (ArgumentOutOfRangeException)
             {
-                AI.Amount = p.Substring(24); //14 byte max but can be less.
-                AI.Amount = AI.Amount.TrimEnd(',', '/');
-            } catch (ArgumentOutOfRangeException e)
+                Console.WriteLine("exception caught");
+            }
+            finally
             {
-                Console.WriteLine(e);
-            } finally
-            {
-                Console.WriteLine("this is my finally statement");
+                Console.WriteLine("recordcode " + AI.RecordCode);
+                Console.WriteLine("customer account number " + AI.CustomerAccountNumber);
+                Console.WriteLine("currency code " + AI.CurrencyCode);
+                Console.WriteLine("typecode " + AI.TypeCode);
+                Console.WriteLine("amount " + AI.Amount);
+                Console.WriteLine("itemcount " + AI.ItemCount);
+                Console.WriteLine("fundstype " + AI.FundsType);
             }
             if (g == 3)
             {
@@ -1574,106 +1640,491 @@ namespace ACH_Decomp
                     StringWriter ssw = new StringWriter(sb);
                     JsonWriter w = new JsonTextWriter(sw);
                     w.Formatting = Newtonsoft.Json.Formatting.Indented;
-                    w.WriteStartObject();
+                    //w.WriteStartObject();
                     w.WritePropertyName("AccountIdentifier");
                     w.WriteStartObject();
                     w.WritePropertyName("RecordCode");
                     w.WriteValue(AI.RecordCode);
                     w.WritePropertyName("CustomerAccountNumber");
                     w.WriteValue(AI.CustomerAccountNumber);
-                    w.WritePropertyName("TypeCode"); //check if null
-                    w.WriteValue(AI.TypeCode);
-                    w.WritePropertyName("Amount"); //check if null
-                    w.WriteValue(AI.Amount);
+                    if (AI.TypeCode == null)
+                    {
+                        Console.WriteLine("typecode null, skipped.");
+                    }
+                    else
+                    {
+                        w.WritePropertyName("TypeCode");
+                        w.WriteValue(AI.TypeCode);
+                    }
+                    if (AI.Amount == null)
+                    {
+                        Console.WriteLine("amount null, skipped");
+                    }
+                    else
+                    {
+                        w.WritePropertyName("Amount");
+                        w.WriteValue(AI.Amount);
+                    }
+                    if (AI.ItemCount == null)
+                    {
+                        Console.WriteLine("item count null, skipped");
+                    } else
+                    {
+                        w.WritePropertyName("ItemCount");
+                        w.WriteValue(AI.ItemCount);
+                    }
+                    if (AI.FundsType == null)
+                    {
+                        Console.WriteLine("funds type null, skipped");
+                    } else
+                    {
+                        w.WritePropertyName("FundsType");
+                        w.WriteValue(AI.FundsType);
+                    }
                     w.WriteEndObject();
                     sw.WriteLine(",");
                 }
 
             }
-            //AI.ItemCount = p.Substring(38, 1);
-            //AI.FundsType = p.Substring(39, 1);
         }
         private int nextint { get; set; }
-        public void WIRE_TransDetail(string p) //TODO parse them via comma, substringing doesn't seem to work well!
+        public void WIRE_TransDetail(string p) //TODO finish this - maybe implement comma counting? 
         {
             TransactionDetail TD = new TransactionDetail();
-            TD.RecordCode = p.Substring(0, 2);
-            TD.TypeCode = p.Substring(3, 3);
+            TD.RecordCode = p.Substring(0, 2); //fixed length
+            TD.TypeCode = p.Substring(3, 3); //fixed length
             try
             {
                 TD.Amount = p.Substring(7);
                 int ind = TD.Amount.IndexOf(',');
                 TD.Amount = TD.Amount.Substring(0, ind);
                 nextint = (TD.RecordCode.Length + TD.TypeCode.Length + TD.Amount.Length + 3); //3 commas
-            } catch (ArgumentOutOfRangeException e)
+                TD.FundsType = p.Substring(nextint, 1);
+            }
+            catch (ArgumentOutOfRangeException e)
             {
                 Console.WriteLine(e);
-            } finally
-            {
-                Console.WriteLine("welcome to my finally statement!");
             }
-            TD.FundsType = p.Substring(nextint, 1);
-            Console.WriteLine(TD.FundsType);
-            
+            finally
+            {
+                Console.WriteLine(TD.FundsType);
+            }
             FType = TD.FundsType;
             switch (TD.FundsType)
             {
                 case "0": //immediate delivery
                     Console.WriteLine("FundsType: " + TD.FundsType);
                     nextint = (TD.RecordCode.Length + TD.TypeCode.Length + TD.Amount.Length + TD.FundsType.Length + 4);
-                    Console.WriteLine(nextint);
+                    TD.StateSite = p.Substring(nextint);
+                    int ssin = TD.StateSite.IndexOf(',');
+                    TD.StateSite = TD.StateSite.Substring(0, ssin);
+                    Console.WriteLine(TD.StateSite);
+                    nextint = (TD.RecordCode.Length + TD.TypeCode.Length + TD.Amount.Length + TD.FundsType.Length + TD.StateSite.Length + 5);
+                    TD.Text = p.Substring(nextint);
+                    ssin = TD.Text.IndexOf('/');
+                    TD.Text = TD.Text.Substring(0, ssin);
+                    Console.WriteLine(TD.Text);
                     break;
                 case "1": //1 day availability
                     Console.WriteLine("FundsType: " + TD.FundsType);
+                    nextint = (TD.RecordCode.Length + TD.TypeCode.Length + TD.Amount.Length + TD.FundsType.Length + 4);
+                    TD.StateSite = p.Substring(nextint);
+                    int sssin = TD.StateSite.IndexOf(',');
+                    TD.StateSite = TD.StateSite.Substring(0, sssin);
+                    Console.WriteLine(TD.StateSite);
+                    nextint = (TD.RecordCode.Length + TD.TypeCode.Length + TD.Amount.Length + TD.FundsType.Length + TD.StateSite.Length + 5);
+                    TD.Text = p.Substring(nextint);
+                    sssin = TD.Text.IndexOf('/');
+                    TD.Text = TD.Text.Substring(0, sssin);
+                    Console.WriteLine(TD.Text);
                     break;
                 case "2": //two or more day availability
                     Console.WriteLine("FundsType: " + TD.FundsType);
+                    nextint = (TD.RecordCode.Length + TD.TypeCode.Length + TD.Amount.Length + TD.FundsType.Length + 4);
+                    TD.StateSite = p.Substring(nextint);
+                    int iin = TD.StateSite.IndexOf(',');
+                    TD.StateSite = TD.StateSite.Substring(0, iin);
+                    Console.WriteLine(TD.StateSite);
+                    nextint = (TD.RecordCode.Length + TD.TypeCode.Length + TD.Amount.Length + TD.FundsType.Length + TD.StateSite.Length + 5);
+                    TD.Text = p.Substring(nextint);
+                    iin = TD.Text.IndexOf('/');
+                    TD.Text = TD.Text.Substring(0, iin);
+                    Console.WriteLine(TD.Text);
                     break;
-                case "S": //distributed availability
-                    try
+                case "S":
+                    //the really dumb thing about this field, is that it is completely optional
+                    //you can have the S, but you don't need any funds to follow
+                    //how the hell does one determine whether the next field is the state site or an amount?
+                    int i = TD.RecordCode.Length + TD.TypeCode.Length + TD.Amount.Length + TD.FundsType.Length + 4;
+                    Console.WriteLine("index at " + i);
+                    TD.SField1 = p.Substring(i);
+                    int count = TD.SField1.Split(',').Length - 1;
+                    Console.WriteLine("number of commas " + count);
+                    //if theres four commas, that would imply that there's 5 fields
+                    //3 commas = 4 fields
+                    //2 commas = 3 fields
+                    //1 comma = 2 fields
+                    switch (count)
                     {
-                        Console.WriteLine("FundsType: " + TD.FundsType);
-                        nextint = (TD.RecordCode.Length + TD.TypeCode.Length + TD.Amount.Length + TD.FundsType.Length + 4);
-                        TD.SField1 = p.Substring(nextint);
-                        int ind = TD.SField1.IndexOf(',');
-                        TD.SField1 = TD.SField1.Substring(0, ind);
-                        nextint = (TD.RecordCode.Length + TD.TypeCode.Length + TD.Amount.Length + TD.FundsType.Length + TD.SField1.Length + 5);
-                        TD.SField2 = p.Substring(nextint);
-                        ind = TD.SField2.IndexOf(',');
-                        TD.SField2 = TD.SField2.Substring(0, ind);
-                        nextint = (TD.RecordCode.Length + TD.TypeCode.Length + TD.Amount.Length + TD.FundsType.Length + TD.SField1.Length + TD.SField2.Length + 6);
-                        TD.SField3 = p.Substring(nextint);
-                        ind = TD.SField3.IndexOf(',');
-                        TD.SField3 = TD.SField3.Substring(0, ind);
-                        Console.WriteLine(TD.SField1);
-                        Console.WriteLine(TD.SField2);
-                        Console.WriteLine(TD.SField3);
-                    } catch (ArgumentOutOfRangeException e)
-                    {
-                        Console.WriteLine(e);
-                    } finally
-                    {
-                        Console.WriteLine("GO GO GO");
+                        case 4:
+                            int j = TD.SField1.IndexOf(',');
+                            TD.SField1 = TD.SField1.Substring(0, j); //1field
+                            nextint = TD.RecordCode.Length + TD.TypeCode.Length + TD.Amount.Length + TD.FundsType.Length + TD.SField1.Length + 5;
+                            TD.SField2 = p.Substring(nextint);
+                            j = TD.SField2.IndexOf(',');
+                            TD.SField2 = TD.SField2.Substring(0, j); //2field
+                            nextint = nextint + TD.SField2.Length + 1;
+                            TD.SField3 = p.Substring(nextint);
+                            j = TD.SField3.IndexOf(',');
+                            TD.SField3 = TD.SField3.Substring(0, j); //3field
+                            nextint = nextint + TD.SField3.Length + 1;
+                            TD.StateSite = p.Substring(nextint);
+                            j = TD.StateSite.IndexOf(',');
+                            TD.StateSite = TD.StateSite.Substring(0, j); //4field
+                            nextint = nextint + TD.StateSite.Length + 1;
+                            TD.Text = p.Substring(nextint);
+                            j = TD.Text.IndexOf('/');
+                            TD.Text = TD.Text.Substring(0, j); //5field
+                            break;
+                        case 3:
+                            int jj = TD.SField1.IndexOf(',');
+                            TD.SField1 = TD.SField1.Substring(0, jj); //1field
+                            nextint = nextint + TD.FundsType.Length + TD.SField1.Length + 2;
+                            TD.SField2 = p.Substring(nextint);
+                            jj = TD.SField2.IndexOf(',');
+                            TD.SField2 = TD.SField2.Substring(0, jj); //2field
+                            nextint = nextint + TD.SField2.Length + 1;
+                            TD.StateSite = p.Substring(nextint);
+                            jj = TD.StateSite.IndexOf(',');
+                            TD.StateSite = TD.StateSite.Substring(0, jj); //3field
+                            nextint = nextint + TD.StateSite.Length + 1;
+                            TD.Text = p.Substring(nextint);
+                            jj = TD.Text.IndexOf('/');
+                            TD.Text = TD.Text.Substring(0, jj); //4field
+                            break;
+                        case 2:
+                            int j2 = TD.SField1.IndexOf(',');
+                            TD.SField1 = TD.SField1.Substring(0, j2); //1field
+                            nextint = nextint + TD.FundsType.Length + TD.SField1.Length + 2;
+                            TD.StateSite = p.Substring(nextint);
+                            j2 = TD.StateSite.IndexOf(',');
+                            TD.StateSite = TD.StateSite.Substring(0, j2); //2field
+                            nextint = nextint + TD.StateSite.Length + 1;
+                            TD.Text = p.Substring(nextint);
+                            j2 = TD.Text.IndexOf('/');
+                            TD.Text = TD.Text.Substring(0, j2); //3field
+                            break;
+                        case 1:
+                            int jjj = TD.SField1.IndexOf(',');
+                            TD.StateSite = TD.SField1.Substring(0, jjj); //1field
+                            TD.SField1 = null;
+                            nextint = nextint + TD.FundsType.Length + TD.StateSite.Length + 2;
+                            TD.Text = p.Substring(nextint);
+                            jjj = TD.Text.IndexOf('/');
+                            TD.Text = TD.Text.Substring(0, jjj); //2field
+                            break;
+                        case 0:
+                            Console.WriteLine("no lines found after...");                           
+                            break;
                     }
                     break;
-                case "V": //value dated
-                    Console.WriteLine("FundsType: " + TD.FundsType);
+                case "V": //value dated -  fix this to use comma countingTM
+                    int k = TD.RecordCode.Length + TD.TypeCode.Length + TD.Amount.Length + TD.FundsType.Length + 4;
+                    TD.VField1 = p.Substring(k);
+                    int kount = TD.VField1.Split(',').Length - 1;
+                    Console.WriteLine("number of commas: " + kount);
+                    switch (kount)
+                    {
+                        case 3:
+                            int k3 = TD.VField1.IndexOf(',');
+                            TD.VField1 = TD.VField1.Substring(0, k3); //1field
+                            nextint = nextint + TD.FundsType.Length + TD.VField1.Length + 2;
+                            TD.VField2 = p.Substring(nextint);
+                            k3 = TD.VField2.IndexOf(',');
+                            TD.VField2 = TD.VField2.Substring(0, k3); //2field
+                            nextint = nextint + TD.VField2.Length + 1;
+                            TD.StateSite = p.Substring(nextint);
+                            k3 = TD.StateSite.IndexOf(',');
+                            TD.StateSite = TD.StateSite.Substring(0, k3); //3field
+                            nextint = nextint + TD.StateSite.Length + 1;
+                            TD.Text = p.Substring(nextint);
+                            k3 = TD.Text.IndexOf('/');
+                            TD.Text = TD.Text.Substring(0, k3); //4field
+                            break;
+                        case 2:
+                            int k2 = TD.VField1.IndexOf(',');
+                            TD.VField1 = TD.VField1.Substring(0, k2); //1field
+                            nextint = nextint + TD.FundsType.Length + TD.VField1.Length + 2;
+                            TD.StateSite = p.Substring(nextint);
+                            k2 = TD.StateSite.IndexOf(',');
+                            TD.StateSite = TD.StateSite.Substring(0, k2); //2field
+                            nextint = nextint + TD.StateSite.Length + 1;
+                            TD.Text = p.Substring(nextint);
+                            k2 = TD.Text.IndexOf('/');
+                            TD.Text = TD.Text.Substring(0, k2); //3field
+                            break;
+                        case 1:
+                            break;
+                    }
                     break;
-                case "D": //distributed availability
+                case "D": //distributed availability TODO
                     Console.WriteLine("FundsType: " + TD.FundsType);
+                    nextint = (TD.RecordCode.Length + TD.TypeCode.Length + TD.Amount.Length + TD.FundsType.Length + 4);
+                    TD.D1 = p.Substring(nextint);
+                    int din = TD.D1.IndexOf(',');
+                    TD.D1 = TD.D1.Substring(0, din);
+                    int numdis = Convert.ToInt32(TD.D1); //number of distributions
+                    Console.WriteLine(numdis);
                     break;
                 case "Z": //unknown / default
                     Console.WriteLine("FundsType: " + TD.FundsType);
+                    nextint = (TD.RecordCode.Length + TD.TypeCode.Length + TD.Amount.Length + TD.FundsType.Length + 4);
+                    TD.StateSite = p.Substring(nextint);
+                    int u = TD.StateSite.IndexOf(',');
+                    TD.StateSite = TD.StateSite.Substring(0, u);
+                    Console.WriteLine(TD.StateSite);
+                    nextint = (TD.RecordCode.Length + TD.TypeCode.Length + TD.Amount.Length + TD.FundsType.Length + TD.StateSite.Length + 5);
+                    TD.Text = p.Substring(nextint);
+                    u = TD.Text.IndexOf('/');
+                    TD.Text = TD.Text.Substring(0, u);
+                    Console.WriteLine(TD.Text);
                     break;
             }
-            
-            
+            if (g == 3)
+            {
+                using (StreamWriter sw = File.AppendText(filepath))
+                {
+                    StringBuilder sb = new StringBuilder();
+                    StringWriter ssw = new StringWriter(sb);
+                    JsonWriter w = new JsonTextWriter(sw);
+                    w.Formatting = Newtonsoft.Json.Formatting.Indented;
+                    //w.WriteStartObject();
+                    w.WritePropertyName("TransactionDetail");
+                    w.WriteStartObject();
+                    w.WritePropertyName("RecordCode");
+                    w.WriteValue(TD.RecordCode);
+                    w.WritePropertyName("TypeCode");
+                    w.WriteValue(TD.TypeCode);
+                    w.WritePropertyName("Amount");
+                    w.WriteValue(TD.Amount);
+                    w.WritePropertyName("FundsType");
+                    w.WriteValue(TD.FundsType);
+                    //S fundstype...
+                    if (TD.SField1 == null)
+                    {
+                        Console.WriteLine("sfield null, skipping");
+                    } else
+                    {
+                        w.WritePropertyName("ImmediateAvailabilityAmount");
+                        w.WriteValue(TD.SField1);
+                    }
+                    if (TD.SField2 == null)
+                    {
+                        Console.WriteLine("sfield2 null, skipping");
+                    }
+                    else
+                    {
+                        w.WritePropertyName("OneDayAvailabilityAmount");
+                        w.WriteValue(TD.SField2);
+                    }
+                    if (TD.SField3 == null)
+                    {
+                        Console.WriteLine("sfield3 null, skipping");
+                    }
+                    else
+                    {
+                        w.WritePropertyName("MoreThanOneDayAvailabilityAmount");
+                        w.WriteValue(TD.SField3);
+                    }
+                    //v field
+                    if(TD.VField1 == null)
+                    {
+                        Console.WriteLine("vfield1 null, skipping");
+                    } else
+                    {
+                        w.WritePropertyName("ValueDate");
+                        w.WriteValue(TD.VField1);
+                    }
+                    if(TD.VField2 == null)
+                    {
+                        Console.WriteLine("vfield2 null, skipping");
+                    } else
+                    {
+                        w.WritePropertyName("ValueTime");
+                        w.WriteValue(TD.VField2);
+                    }
+                    w.WritePropertyName("BankReferenceNumber");
+                    w.WriteValue(TD.StateSite);
+                    if (TD.Text == null)
+                    {
+                        Console.WriteLine("text field null, skipping");
+                    } else
+                    {
+                        w.WritePropertyName("Text");
+                        w.WriteValue(TD.Text);
+                    }
+                    w.WriteEndObject();
+                    sw.WriteLine(",");
+                }
+
+            }
+
+
         }
+        public void WIRE_Continuation(string p)
+        {
+            ContinuationRecord cr = new ContinuationRecord();
+            cr.RecordCode = p.Substring(0, 2);
+            cr.NextField = p.Substring(3); //might as well just parse the rest!
+            Console.WriteLine(cr.RecordCode);
+            Console.WriteLine(cr.NextField);
+            if (g == 3)
+            {
+                using (StreamWriter sw = File.AppendText(filepath))
+                {
+                    StringBuilder sb = new StringBuilder();
+                    StringWriter ssw = new StringWriter(sb);
+                    JsonWriter w = new JsonTextWriter(sw);
+                    w.Formatting = Newtonsoft.Json.Formatting.Indented;
+                    //w.WriteStartObject();
+                    w.WritePropertyName("ContinuationRecord");
+                    w.WriteStartObject();
+                    w.WritePropertyName("RecordCode");
+                    w.WriteValue(cr.RecordCode);
+                    w.WritePropertyName("NextField");
+                    w.WriteValue(cr.NextField);
+                    w.WriteEndObject();
+                    sw.WriteLine(",");
+                }
 
+            }
 
+        }
+        public void WIRE_AccountTrailer(string p)
+        {
+            AccountTrailer at = new AccountTrailer();
+            at.RecordCode = p.Substring(0, 2);
+            at.AccountControlTotal = p.Substring(3);
+            int ind = at.AccountControlTotal.IndexOf(',');
+            at.AccountControlTotal = at.AccountControlTotal.Substring(0, ind);
+            int nextindex = (at.RecordCode.Length + at.AccountControlTotal.Length + 2);
+            at.NumberOfRecords = p.Substring(nextindex);
+            ind = at.NumberOfRecords.IndexOf('/');
+            at.NumberOfRecords = at.NumberOfRecords.Substring(0, ind);
+            Console.WriteLine(at.RecordCode);
+            Console.WriteLine(at.AccountControlTotal);
+            Console.WriteLine(at.NumberOfRecords);
+            if (g == 3)
+            {
+                using (StreamWriter sw = File.AppendText(filepath))
+                {
+                    StringBuilder sb = new StringBuilder();
+                    StringWriter ssw = new StringWriter(sb);
+                    JsonWriter w = new JsonTextWriter(sw);
+                    w.Formatting = Newtonsoft.Json.Formatting.Indented;
+                    //w.WriteStartObject();
+                    w.WritePropertyName("AccountTrailer");
+                    w.WriteStartObject();
+                    w.WritePropertyName("RecordCode");
+                    w.WriteValue(at.RecordCode);
+                    w.WritePropertyName("AccountControlTotal");
+                    w.WriteValue(at.AccountControlTotal);
+                    w.WritePropertyName("NumberOfRecords");
+                    w.WriteValue(at.NumberOfRecords);
+                    w.WriteEndObject();
+                    sw.WriteLine(",");
+                }
+            }
 
+        }
+        public void WIRE_GroupTrailer(string p)
+        {
+            GroupTrailer gt = new GroupTrailer();
+            gt.RecordCode = p.Substring(0, 2);
+            gt.GroupControlTotal = p.Substring(3);
+            int i = gt.GroupControlTotal.IndexOf(',');
+            gt.GroupControlTotal = gt.GroupControlTotal.Substring(0, i);
+            int ni = (gt.RecordCode.Length + gt.GroupControlTotal.Length + 2);
+            gt.NumberOfAccounts = p.Substring(ni);
+            i = gt.NumberOfAccounts.IndexOf(',');
+            gt.NumberOfAccounts = gt.NumberOfAccounts.Substring(0, i);
+            ni = ni + (gt.NumberOfAccounts.Length + 1); //dont know why i didn't think of this earlier.
+            gt.NumberOfRecords = p.Substring(ni);
+            i = gt.NumberOfRecords.IndexOf('/');
+            gt.NumberOfRecords = gt.NumberOfRecords.Substring(0, i);
+            Console.WriteLine(gt.RecordCode);
+            Console.WriteLine(gt.GroupControlTotal);
+            Console.WriteLine(gt.NumberOfAccounts);
+            Console.WriteLine(gt.NumberOfRecords);
+            if (g == 3)
+            {
+                using (StreamWriter sw = File.AppendText(filepath))
+                {
+                    StringBuilder sb = new StringBuilder();
+                    StringWriter ssw = new StringWriter(sb);
+                    JsonWriter w = new JsonTextWriter(sw);
+                    w.Formatting = Newtonsoft.Json.Formatting.Indented;
+                    //w.WriteStartObject();
+                    w.WritePropertyName("GroupTrailer");
+                    w.WriteStartObject();
+                    w.WritePropertyName("RecordCode");
+                    w.WriteValue(gt.RecordCode);
+                    w.WritePropertyName("GroupControlTotal");
+                    w.WriteValue(gt.GroupControlTotal);
+                    w.WritePropertyName("NumberOfAccounts");
+                    w.WriteValue(gt.NumberOfAccounts);
+                    w.WritePropertyName("NumberOfRecords");
+                    w.WriteValue(gt.NumberOfRecords);
+                    w.WriteEndObject();
+                    sw.WriteLine(",");
+                }
+            }
 
+        }
+        public void WIRE_FileTrailer(string p)
+        {
+            FileTrailer ft = new FileTrailer();
+            ft.RecordCode = p.Substring(0, 2);
+            ft.FileControlTotal = p.Substring(3);
+            int i = ft.FileControlTotal.IndexOf(',');
+            ft.FileControlTotal = ft.FileControlTotal.Substring(0, i);
+            int ni = (ft.RecordCode.Length + ft.FileControlTotal.Length + 2);
+            ft.NumberOfGroups = p.Substring(ni);
+            i = ft.NumberOfGroups.IndexOf(',');
+            ft.NumberOfGroups = ft.NumberOfGroups.Substring(0, i);
+            ni = ni + (ft.NumberOfGroups.Length + 1);
+            ft.NumberOfRecords = p.Substring(ni);
+            i = ft.NumberOfRecords.IndexOf('/');
+            ft.NumberOfRecords = ft.NumberOfRecords.Substring(0, i);
+            Console.WriteLine(ft.RecordCode);
+            Console.WriteLine(ft.FileControlTotal);
+            Console.WriteLine(ft.NumberOfGroups);
+            Console.WriteLine(ft.NumberOfRecords);
+            if (g == 3)
+            {
+                using (StreamWriter sw = File.AppendText(filepath))
+                {
+                    StringBuilder sb = new StringBuilder();
+                    StringWriter ssw = new StringWriter(sb);
+                    JsonWriter w = new JsonTextWriter(sw);
+                    w.Formatting = Newtonsoft.Json.Formatting.Indented;
+                    //w.WriteStartObject();
+                    w.WritePropertyName("FileTrailer");
+                    w.WriteStartObject();
+                    w.WritePropertyName("RecordCode");
+                    w.WriteValue(ft.RecordCode);
+                    w.WritePropertyName("FileControlTotal");
+                    w.WriteValue(ft.FileControlTotal);
+                    w.WritePropertyName("NumberOfGroups");
+                    w.WriteValue(ft.NumberOfGroups);
+                    w.WritePropertyName("NumberOfRecords");
+                    w.WriteValue(ft.NumberOfRecords);
+                    w.WriteEndObject();
+                    w.Close();
+                }
+            }
 
+        }
         //********** WIRE CONVERSION END **********//
     }
 }
