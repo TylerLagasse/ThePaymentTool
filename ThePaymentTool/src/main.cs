@@ -126,6 +126,7 @@ namespace ACH_Decomp
                                     {
                                         //Transaction Detail
                                         ADCount++;
+                                        c.ADCount = ADCount;
                                         c.WIRE_TransDetail(line);
                                         counter++;
                                     }

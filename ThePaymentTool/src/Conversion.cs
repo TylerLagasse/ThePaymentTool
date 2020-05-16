@@ -3,6 +3,8 @@ using System.Text;
 using Newtonsoft.Json;
 using System.IO;
 using System.Xml;
+using System.Collections.Generic;
+using System.Linq;
 
 namespace ACH_Decomp
 {
@@ -1710,6 +1712,9 @@ namespace ACH_Decomp
                 Console.WriteLine(TD.FundsType);
             }
             FType = TD.FundsType;
+            Console.WriteLine("FundsType is " + FType);
+            List<string> funds = new List<string>();
+            //var funds = new Dictionary<string, string>();
             switch (TD.FundsType)
             {
                 case "0": //immediate delivery
@@ -1752,9 +1757,6 @@ namespace ACH_Decomp
                     Console.WriteLine(TD.Text);
                     break;
                 case "S":
-                    //the really dumb thing about this field, is that it is completely optional
-                    //you can have the S, but you don't need any funds to follow
-                    //how the hell does one determine whether the next field is the state site or an amount?
                     int i = TD.RecordCode.Length + TD.TypeCode.Length + TD.Amount.Length + TD.FundsType.Length + 4;
                     Console.WriteLine("index at " + i);
                     TD.SField1 = p.Substring(i);
@@ -1868,16 +1870,38 @@ namespace ACH_Decomp
                     }
                     break;
                 case "D": //distributed availability TODO
-                    Console.WriteLine("FundsType: " + TD.FundsType);
                     nextint = (TD.RecordCode.Length + TD.TypeCode.Length + TD.Amount.Length + TD.FundsType.Length + 4);
                     TD.D1 = p.Substring(nextint);
                     int din = TD.D1.IndexOf(',');
                     TD.D1 = TD.D1.Substring(0, din);
                     int numdis = Convert.ToInt32(TD.D1); //number of distributions
-                    Console.WriteLine(numdis);
+                    nextint = nextint + TD.D1.Length + 1; //index at 17 (col 18)
+
+                    DType d = new DType();
+                    for (int t = 0; t < numdis; t++)
+                    {
+                        TD.D2 = p.Substring(nextint);
+                        din = TD.D2.IndexOf(',');
+                        TD.D2 = TD.D2.Substring(0, din);
+                        Console.WriteLine("dayavail = " + TD.D2);
+                        nextint = nextint + TD.D2.Length + 1;
+                        TD.D3 = p.Substring(nextint);
+                        din = TD.D3.IndexOf(',');
+                        TD.D3 = TD.D3.Substring(0, din);
+                        nextint = nextint + TD.D3.Length + 1;
+                        funds.Add(d.dayAvail = TD.D2);
+                        funds.Add(d.amtAvail = TD.D3);
+                        Console.WriteLine("amtavail = " + TD.D3);
+                    }
+                    TD.StateSite = p.Substring(nextint);
+                    din = TD.StateSite.IndexOf(',');
+                    TD.StateSite = TD.StateSite.Substring(0, din);
+                    nextint = nextint + TD.StateSite.Length + 1;
+                    TD.Text = p.Substring(nextint);
+                    din = TD.Text.IndexOf('/');
+                    TD.Text = TD.Text.Substring(0, din);
                     break;
                 case "Z": //unknown / default
-                    Console.WriteLine("FundsType: " + TD.FundsType);
                     nextint = (TD.RecordCode.Length + TD.TypeCode.Length + TD.Amount.Length + TD.FundsType.Length + 4);
                     TD.StateSite = p.Substring(nextint);
                     int u = TD.StateSite.IndexOf(',');
@@ -1899,7 +1923,7 @@ namespace ACH_Decomp
                     JsonWriter w = new JsonTextWriter(sw);
                     w.Formatting = Newtonsoft.Json.Formatting.Indented;
                     //w.WriteStartObject();
-                    w.WritePropertyName("TransactionDetail");
+                    w.WritePropertyName("TransactionDetail" + ADCount);
                     w.WriteStartObject();
                     w.WritePropertyName("RecordCode");
                     w.WriteValue(TD.RecordCode);
@@ -1952,6 +1976,21 @@ namespace ACH_Decomp
                     {
                         w.WritePropertyName("ValueTime");
                         w.WriteValue(TD.VField2);
+                    }
+                    if (FType == "D")
+                    {
+                        for (int y = 0; y < funds.Count; y++)
+                        {
+                            w.WritePropertyName("AvailabilityInDays" + y);
+                            w.WriteValue(funds[y]);
+                            w.WritePropertyName("AvailableAmount" + y);
+                            w.WriteValue(funds[y + 1]);
+                            y++;
+                        }
+                    }
+                    else
+                    {
+                        Console.WriteLine("skipping");
                     }
                     w.WritePropertyName("BankReferenceNumber");
                     w.WriteValue(TD.StateSite);

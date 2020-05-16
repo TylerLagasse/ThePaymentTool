@@ -50,6 +50,19 @@ namespace ACH_Decomp
         public string SField1;
         public string SField2;
         public string SField3;
+        public string VField1;
+        public string VField2;
+        public string D1;
+        public string D2;
+        public string D3;
+        public string D4;
+        public string D5;
+        public string D6;
+    }
+    class DType
+    {
+        public string dayAvail;
+        public string amtAvail;
     }
     class ContinuationRecord
     {
